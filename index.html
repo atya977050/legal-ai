@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lexbridge Live VIP</title>
+    <!-- مكتبة Agora المباشرة للصوت -->
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            background-color: #080511;
+            background-image: radial-gradient(circle at top, #1e1035 0%, #080511 100%);
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        .app-card {
+            width: 100%;
+            max-width: 480px;
+            height: 100vh;
+            background: rgba(15, 10, 28, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 15px;
+            border: 1px solid #d4af37;
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.25);
+            position: relative;
+        }
+        /* الهيدر العلوي للمنصة */
+        .room-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px 15px;
+            border-radius: 20px;
+            border: 1px solid rgba(212, 175, 55, 0.4);
+        }
+        .room-info h3 {
+            margin: 0;
+            font-size: 16px;
+            color: #ffd700;
+            text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+            letter-spacing: 0.5px;
+        }
+        .room-info small {
+            color: #aaa;
+            font-size: 11px;
+        }
+        .balance-badge {
+            background: linear-gradient(45deg, #bf953f, #fcf6ba, #b38728);
+            color: #000;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-weight: bold;
+            font-size: 12px;
+            box-shadow: 0 2px 8px rgba(212, 175, 55, 0.4);
+        }
+        /* شبكة المقاعد والمايكات */
+        .seats-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .seat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+        }
+        .seat-circle {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px dashed #d4af37;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            position: relative;
+            transition: 0.3s;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+        }
+        .seat-circle.taken {
+            border: 2px solid #00ff88;
+            border-style: solid;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
+            background: rgba(0, 255, 136, 0.1);
+        }
+        .seat-circle.host {
+            border: 2px solid #ffd700;
+            border-style: solid;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+            background: rgba(255, 215, 0, 0.1);
+        }
+        .seat-name {
+            font-size: 11px;
+            color: #ddd;
+            margin-top: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 65px;
+        }
+        .mic-tag {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            background: #111;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ffd700;
+        }
+        /* منطقة الشات المباشر */
+        .chat-section {
+            flex-grow: 1;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 10px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 220px;
+        }
+        .chat-item {
+            font-size: 12px;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+        .chat-user {
+            color: #ffd700;
+            font-weight: bold;
+        }
+        .chat-system {
+            color: #00ff88;
+            font-style: italic;
+        }
+        .chat-gift {
+            color: #ff007f;
+            font-weight: bold;
+        }
+        /* التحكم السفلي وشريط الإرسال */
+        .bottom-bar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .input-chat {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 20px;
+            padding: 10px 15px;
+            color: #fff;
+            font-size: 13px;
+            outline: none;
+        }
+        .input-chat::placeholder { color: #777; }
+        .btn-action {
+            background: linear-gradient(45deg, #bf953f, #fcf6ba, #b38728);
+            border: none;
+            border-radius: 50%;
+            width: 42px;
+            height: 42px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .btn-action:active { transform: scale(0.92); }
+        .btn-mic-main {
+            background: #ff4757;
+            color: white;
+        }
+        .btn-mic-main.active {
+            background: #2ed573;
+        }
+        /* شاشة الهدايا المنبثقة */
+        .gift-modal {
+            display: none;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: #120924;
+            border-top: 2px solid #ffd700;
+            border-radius: 20px 20px 0 0;
+            padding: 15px;
+            box-sizing: border-box;
+            z-index: 100;
+        }
+        .gift-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .gift-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            border-radius: 10px;
+            padding: 10px 5px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .gift-card:active { border-color: #ffd700; background: rgba(255, 215, 0, 0.1); }
+        .gift-icon { font-size: 28px; }
+        .gift-price { font-size: 10px; color: #ffd700; margin-top: 3px; }
+    </style>
+</head>
+<body>
+
+<div class="app-card">
+    <!-- هيدر الغرفة -->
+    <div class="room-header">
+        <div class="room-info">
+            <h3>⚖️ Lexbridge VIP Voice Room</h3>
+            <small>ID: 888999 | 👥 124 متابع</small>
+        </div>
+        <div class="balance-badge">💎 10,500</div>
+    </div>
+
+    <!-- شبكة المايكات الـ 8 -->
+    <div class="seats-container">
+        <!-- المالك -->
+        <div class="seat" onclick="toggleSeat(0)">
+            <div class="seat-circle host" id="seat-0">
+                👑
+                <div class="mic-tag">🎙️</div>
+            </div>
+            <div class="seat-name" id="name-0">المالك VIP</div>
+        </div>
+        <!-- مايك 2 -->
+        <div class="seat" onclick="toggleSeat(1)">
+            <div class="seat-circle" id="seat-1">➕</div>
+            <div class="seat-name" id="name-1">مايك 2</div>
+        </div>
+        <!-- مايك 3 -->
+        <div class="seat" onclick="toggleSeat(2)">
+            <div class="seat-circle" id="seat-2">➕</div>
+            <div class="seat-name" id="name-2">مايك 3</div>
+        </div>
+        <!-- مايك 4 -->
+        <div class="seat" onclick="toggleSeat(3)">
+            <div class="seat-circle" id="seat-3">➕</div>
+            <div class="seat-name" id="name-3">مايك 4</div>
+        </div>
+        <!-- مايك 5 -->
+        <div class="seat" onclick="toggleSeat(4)">
+            <div class="seat-circle" id="seat-4">➕</div>
+            <div class="seat-name" id="name-4">مايك 5</div>
+        </div>
+        <!-- مايك 6 -->
+        <div class="seat" onclick="toggleSeat(5)">
+            <div class="seat-circle" id="seat-5">➕</div>
+            <div class="seat-name" id="name-5">مايك 6</div>
+        </div>
+        <!-- مايك 7 -->
+        <div class="seat" onclick="toggleSeat(6)">
+            <div class="seat-circle" id="seat-6">➕</div>
+            <div class="seat-name" id="name-6">مايك 7</div>
+        </div>
+        <!-- مايك 8 -->
+        <div class="seat" onclick="toggleSeat(7)">
+            <div class="seat-circle" id="seat-7">➕</div>
+            <div class="seat-name" id="name-7">مايك 8</div>
+        </div>
+    </div>
+
+    <!-- الشات المباشر -->
+    <div class="chat-section" id="chatSection">
+        <div class="chat-item"><span class="chat-system">تنبيه النظام:</span> مرحباً بك في منصة Lexbridge الصوتية الفاخرة! التزم بضوابط الحوار.</div>
+    </div>
+
+    <!-- أدوات التحكم والدردشة -->
+    <div class="bottom-bar">
+        <button class="btn-action btn-mic-main" id="micBtn" onclick="toggleMic()">🔇</button>
+        <input type="text" class="input-chat" id="chatInput" placeholder="أرسل رسالة للروم..." onkeypress="handleKeyPress(event)">
+        <button class="btn-action" onclick="sendChatMessage()">💬</button>
+        <button class="btn-action" onclick="openGiftModal()">🎁</button>
+    </div>
+
+    <!-- نافذة الهدايا المنبثقة -->
+    <div class="gift-modal" id="giftModal">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin: 0; color: #ffd700;">🎁 متجر هدايا Lexbridge الفاخرة</h4>
+            <span style="cursor: pointer; font-weight: bold; color: #ff4757;" onclick="closeGiftModal()">✕</span>
+        </div>
+        <div class="gift-grid">
+            <div class="gift-card" onclick="sendGift('سيارة فيراري 🏎️', 500)">
+                <div class="gift-icon">🏎️</div>
+                <div class="gift-price">500 💎</div>
+            </div>
+            <div class="gift-card" onclick="sendGift('تاج الملوك 👑', 200)">
+                <div class="gift-icon">👑</div>
+                <div class="gift-price">200 💎</div>
+            </div>
+            <div class="gift-card" onclick="sendGift('خاتم ألماس 💍', 100)">
+                <div class="gift-icon">💍</div>
+                <div class="gift-price">100 💎</div>
+            </div>
+            <div class="gift-card" onclick="sendGift('وردة حمراء 🌹', 10)">
+                <div class="gift-icon">🌹</div>
+                <div class="gift-price">10 💎</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let isMicOn = false;
+    let rtc = { client: null, localAudioTrack: null };
+
+    // معرف Agora RTC الخاص بمنصة Lexbridge
+    const AGORA_APP_ID = "YOUR_AGORA_APP_ID"; 
+
+    // التبديل بين تشغيل وإيقاف المايك الرئيسي
+    async function toggleMic() {
+        const micBtn = document.getElementById('micBtn');
+        if (!isMicOn) {
+            try {
+                // فتح المايك الصوتي المباشر
+                rtc.client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+                rtc.localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+                
+                micBtn.innerText = "🎙️";
+                micBtn.classList.add('active');
+                isMicOn = true;
+                addChatMessage("النظام", "تم فتح المايك بنجاح في روم Lexbridge!", "chat-system");
+            } catch (e) {
+                alert("يرجى إعطاء صلاحية المايك للتطبيق في هاتفك!");
+            }
+        } else {
+            if(rtc.localAudioTrack) {
+                rtc.localAudioTrack.close();
+            }
+            micBtn.innerText = "🔇";
+            micBtn.classList.remove('active');
+            isMicOn = false;
+            addChatMessage("النظام", "تم كتم الصوت الخاص بك.", "chat-system");
+        }
+    }
+
+    // الصعود على مايك
+    function toggleSeat(index) {
+        if(index === 0) return; // المالك ثابت
+        const seat = document.getElementById(`seat-${index}`);
+        const name = document.getElementById(`name-${index}`);
+
+        if (seat.classList.contains('taken')) {
+            seat.classList.remove('taken');
+            seat.innerHTML = "➕";
+            name.innerText = `مايك ${index + 1}`;
+            addChatMessage("النظام", `غادر المستخدم المايك رقم ${index + 1}`, "chat-system");
+        } else {
+            seat.classList.add('taken');
+            seat.innerHTML = "😎 <div class='mic-tag'>🎙️</div>";
+            name.innerText = "عضو VIP";
+            addChatMessage("النظام", `صعد عضو جديد على مايك Lexbridge رقم ${index + 1}`, "chat-system");
+        }
+    }
+
+    // إرسال رسالة شات
+    function sendChatMessage() {
+        const input = document.getElementById('chatInput');
+        const text = input.value.trim();
+        if (text !== "") {
+            addChatMessage("أنت", text, "");
+            input.value = "";
+        }
+    }
+
+    function handleKeyPress(e) {
+        if (e.key === 'Enter') sendChatMessage();
+    }
+
+    function addChatMessage(user, msg, customClass) {
+        const chatSection = document.getElementById('chatSection');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `chat-item ${customClass}`;
+        msgDiv.innerHTML = `<span class="chat-user">${user}:</span> ${msg}`;
+        chatSection.appendChild(msgDiv);
+        chatSection.scrollTop = chatSection.scrollHeight;
+    }
+
+    // إدارة الهدايا
+    function openGiftModal() { document.getElementById('giftModal').style.display = 'block'; }
+    function closeGiftModal() { document.getElementById('giftModal').style.display = 'none'; }
+
+    function sendGift(giftName, price) {
+        addChatMessage("🎉 Lexbridge VIP", `أرسل ${giftName} بقيمة ${price} 💎!`, "chat-gift");
+        closeGiftModal();
+    }
+</script>
+
+</body>
+</html>
